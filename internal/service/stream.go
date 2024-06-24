@@ -1,7 +1,7 @@
 package service
 
 import (
-	"iberpay/internal/types"
+	"redis_bank_transfers/internal/types"
 )
 
 type Stream interface {

@@ -3,8 +3,8 @@ package store
 import (
 	"context"
 
-	"iberpay/internal/repository"
-	"iberpay/internal/types"
+	"redis_bank_transfers/internal/repository"
+	"redis_bank_transfers/internal/types"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"iberpay/internal/repository"
-	"iberpay/internal/types"
+	"redis_bank_transfers/internal/repository"
+	"redis_bank_transfers/internal/types"
 
 	"github.com/redis/go-redis/v9"
 )

@@ -1,6 +1,6 @@
 package service
 
-import "iberpay/internal/types"
+import "redis_bank_transfers/internal/types"
 
 type Reporter interface {
 	AddEvent(transaction types.Transaction)

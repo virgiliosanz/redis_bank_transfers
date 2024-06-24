@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"iberpay/internal/types"
+	"redis_bank_transfers/internal/types"
 
 	"golang.org/x/exp/maps"
 )

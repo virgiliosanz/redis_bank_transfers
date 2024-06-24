@@ -5,33 +5,27 @@ import (
 	"fmt"
 	"log"
 
-	"iberpay/internal/repository"
-	"iberpay/internal/store"
+	"redis_bank_transfers/config"
+	"redis_bank_transfers/internal/repository"
+	"redis_bank_transfers/internal/store"
 )
 
-type Configuration struct {
-	redisURL        string
-	prefix          string
-	accountsFile    string
-	redisMaxRetries int
-}
-
-func setUp() *Configuration {
-	cfg := Configuration{}
-	flag.StringVar(&cfg.redisURL, "u", "redis://127.0.0.1:6379/", "Redis Connection Url")
-	flag.StringVar(&cfg.accountsFile, "f", "data/accounts_1000.csv", "File with generated bank accounts.")
-	flag.StringVar(&cfg.prefix, "p", "iberpay", "Redis global prefix for application")
-	flag.IntVar(&cfg.redisMaxRetries, "r", 100, "Redis max number of retries to adquire lock")
+func setUp() *config.Configuration {
+	cfg := config.GetDefaults()
+	flag.StringVar(&cfg.RedisURL, "u", cfg.RedisURL, "Redis Connection Url")
+	flag.StringVar(&cfg.AccountsFile, "f", cfg.AccountsFile, "File with generated bank accounts.")
+	flag.StringVar(&cfg.Prefix, "p", cfg.Prefix, "Redis global prefix for application")
+	flag.IntVar(&cfg.RedisMaxRetries, "r", cfg.RedisMaxRetries, "Redis max number of retries to adquire lock")
 
 	flag.Parse()
 
-	return &cfg
+	return cfg
 }
 
 func main() {
 	cfg := setUp()
-	fmt.Printf("Initializing database on %s\n", cfg.redisURL)
-	repo := repository.NewRedisRepository(cfg.redisURL, cfg.prefix, cfg.redisMaxRetries)
+	fmt.Printf("Initializing database on %s\n", cfg.RedisURL)
+	repo := repository.NewRedisRepository(cfg.RedisURL, cfg.Prefix, cfg.RedisMaxRetries)
 	defer repo.Close()
 
 	// delete database data
@@ -39,9 +33,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Insert data loaded from: %s\n", cfg.accountsFile)
+	fmt.Printf("Insert data loaded from: %s\n", cfg.AccountsFile)
 	// Read accounts from csv
-	loader := store.NewCsvLoader(cfg.accountsFile)
+	loader := store.NewCsvLoader(cfg.AccountsFile)
 	if err := loader.LoadData(); err != nil {
 		log.Fatal(err)
 	}

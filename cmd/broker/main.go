@@ -9,47 +9,38 @@ import (
 	"runtime"
 	"sync"
 
-	"iberpay/internal/repository"
-	"iberpay/internal/service"
-	"iberpay/internal/store"
-	"iberpay/internal/types"
+	"redis_bank_transfers/config"
+	"redis_bank_transfers/internal/repository"
+	"redis_bank_transfers/internal/service"
+	"redis_bank_transfers/internal/store"
+	"redis_bank_transfers/internal/types"
 
 	"github.com/gosuri/uiprogress"
 )
 
 const maxConcurrency = 100
 
-type Configuration struct {
-	accountsFile    string
-	redisURL        string
-	prefix          string
-	redisMaxRetries int
-	transactions    int
-	transferMin     uint
-	transferMax     uint
-	concurrency     uint
-}
+func setUp() *config.Configuration {
+	cfg := config.GetDefaults()
+	// cfg := config.Configuration{}
 
-func setUp() *Configuration {
-	cfg := Configuration{}
-
-	flag.StringVar(&cfg.accountsFile, "f", "data/accounts_1000.csv", "File with generated bank accounts.")
-	flag.StringVar(&cfg.redisURL, "u", "redis://127.0.0.1:6379/", "Redis Connection Url")
-	flag.StringVar(&cfg.prefix, "p", "iberpay", "Redis global prefix for application")
-	flag.IntVar(&cfg.redisMaxRetries, "r", 100, "Redis max number of retries to adquire lock")
-	flag.IntVar(&cfg.transactions, "t", 10000, "Number of transactions per job")
-	flag.UintVar(&cfg.transferMin, "min", 100, "Minimum ammount of money to trasfer")
-	flag.UintVar(&cfg.transferMax, "max", 1000, "Maximun ammount of money to trasfer")
-	flag.UintVar(&cfg.concurrency, "c", 20, "Number of Jobs/Threats to work in parallel")
+	flag.StringVar(&cfg.AccountsFile, "f", cfg.AccountsFile, "File with generated bank accounts.")
+	flag.StringVar(&cfg.RedisURL, "u", cfg.RedisURL, "Redis Connection Url")
+	flag.StringVar(&cfg.Prefix, "p", cfg.Prefix, "Redis global prefix for application")
+	flag.IntVar(&cfg.RedisMaxRetries, "r", cfg.RedisMaxRetries, "Redis max number of retries to adquire lock")
+	flag.IntVar(&cfg.Transactions, "t", cfg.Transactions, "Number of transactions per job")
+	flag.UintVar(&cfg.TransferMin, "min", cfg.TransferMin, "Minimum ammount of money to trasfer")
+	flag.UintVar(&cfg.TransferMax, "max", cfg.TransferMax, "Maximun ammount of money to trasfer")
+	flag.UintVar(&cfg.Concurrency, "c", cfg.Concurrency, "Number of Jobs/Threats to work in parallel")
 
 	flag.Parse()
 
-	return &cfg
+	return cfg
 }
 
-func randonMoney(cfg *Configuration) int64 {
-	max := int(cfg.transferMax)
-	min := int(cfg.transferMin)
+func randonMoney(cfg *config.Configuration) int64 {
+	max := int(cfg.TransferMax)
+	min := int(cfg.TransferMin)
 	value := rand.Intn(max-min+1) + min
 
 	return int64(value)
@@ -61,15 +52,15 @@ func main() {
 
 	cfg := setUp()
 	fmt.Println("Starting Generating transactions using:")
-	fmt.Printf("\tAccounts File: %s\n", cfg.accountsFile)
-	fmt.Printf("\tNumber of transactions: %d\n", cfg.transactions)
-	fmt.Printf("\tNumber of parallel jobs: %d\n", cfg.concurrency)
+	fmt.Printf("\tAccounts File: %s\n", cfg.AccountsFile)
+	fmt.Printf("\tNumber of transactions: %d\n", cfg.Transactions)
+	fmt.Printf("\tNumber of parallel jobs: %d\n", cfg.Concurrency)
 
-	repo := repository.NewRedisRepository(cfg.redisURL, cfg.prefix, cfg.redisMaxRetries)
+	repo := repository.NewRedisRepository(cfg.RedisURL, cfg.Prefix, cfg.RedisMaxRetries)
 	defer repo.Close()
 
 	// Read accounts from csv
-	loader := store.NewCsvLoader(cfg.accountsFile)
+	loader := store.NewCsvLoader(cfg.AccountsFile)
 	if err := loader.LoadData(); err != nil {
 		log.Fatal(err)
 	}
@@ -78,14 +69,14 @@ func main() {
 	var wg sync.WaitGroup
 	uiprogress.Start()
 	bars := [maxConcurrency]*uiprogress.Bar{}
-	for i := 1; i <= int(cfg.concurrency); i++ {
+	for i := 1; i <= int(cfg.Concurrency); i++ {
 		wg.Add(1)
-		bars[i] = uiprogress.AddBar(cfg.transactions).AppendCompleted().PrependElapsed()
+		bars[i] = uiprogress.AddBar(cfg.Transactions).AppendCompleted().PrependElapsed()
 		go func(id int) {
 			defer wg.Done()
 			// fmt.Fprintf(os.Stderr, "Goroutine %d started\n", id)
 
-			repo := repository.NewRedisRepository(cfg.redisURL, cfg.prefix, cfg.redisMaxRetries)
+			repo := repository.NewRedisRepository(cfg.RedisURL, cfg.Prefix, cfg.RedisMaxRetries)
 			defer repo.Close()
 
 			broker := service.NewRedisBroker(repo)

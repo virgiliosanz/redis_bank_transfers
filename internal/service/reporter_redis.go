@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"iberpay/internal/repository"
-	"iberpay/internal/store"
-	"iberpay/internal/types"
+	"redis_bank_transfers/internal/repository"
+	"redis_bank_transfers/internal/store"
+	"redis_bank_transfers/internal/types"
 
 	"github.com/gosuri/uilive"
 )

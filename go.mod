@@ -1,4 +1,4 @@
-module iberpay
+module redis_bank_transfers
 
 go 1.22.3
 
