@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -x
+
+HERE=$(dirname "${0}")
+
+REDIS_DATA_DIR="${HERE}/../data/redis/"
+mkdir -p "${REDIS_DATA_DIR}"
+echo "Datadir: ${REDIS_DATA_DIR}"
+
+CONFFILE="${1}"
+CMD="redis-server"
+MODULEDIR="/opt/homebrew/lib"
+MAXCLIENTS=100
+
+echo "Starting redis-stack-server, database path ${REDIS_DATA_DIR}"
+
+${CMD} \
+	"${CONFFILE}" \
+	--dir ${REDIS_DATA_DIR} \
+	--protected-mode no \
+	--daemonize no \
+	--maxclients ${MAXCLIENTS} \
+	--loadmodule "${MODULEDIR}/rediscompat.so" \
+	--loadmodule "${MODULEDIR}/redisearch.so" \
+	--loadmodule "${MODULEDIR}/redistimeseries.so" \
+	--loadmodule "${MODULEDIR}/rejson.so" \
+	--loadmodule "${MODULEDIR}/redisbloom.so"
+# --loadmodule "${MODULEDIR}/redisgears.so" v8-plugin-path "${MODULEDIR}/libredisgears_v8_plugin.so"## "$@" #	--dir "${REDIS_DATA_DIR}" \
