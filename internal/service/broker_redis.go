@@ -78,23 +78,24 @@ func (b *RedisBroker) Transfer(t types.Transaction) types.Transaction {
 		// Operation is commited only if the watched keys remain unchanged.
 		_, err = tx.TxPipelined(b.ctx, func(pipe redis.Pipeliner) error {
 			pipe.IncrBy(b.ctx, fromAccountKey, -t.Ammount)
-			pipe.IncrBy(b.ctx, toAccountKey, t.Ammount)
-			if t.From.Bank != t.To.Bank { // Si es entre el mismo banco no actualizamos
-				pipe.IncrBy(b.ctx, fromBankKey, -t.Ammount)
-				pipe.IncrBy(b.ctx, toBankKey, t.Ammount)
-				pipe.IncrBy(b.ctx, FromToBankBalanceKey, t.Ammount)
-				pipe.IncrBy(b.ctx, ToFromBankBalanceKey, -t.Ammount)
-			}
 			return nil
 		})
 		return err
 	}
 
 	// Retry if the key has been changed.
+	var err error
 	for i := 0; i < b.r.MaxRetries; i++ {
-		err := b.r.Redis.Watch(b.ctx, txf, fromAccountKey)
+		err = b.r.Redis.Watch(b.ctx, txf, fromAccountKey)
 		if err == nil {
-			// Success!!!!
+			// Success!!!! Increment the rest of the values atomically
+			b.r.Redis.IncrBy(b.ctx, toAccountKey, t.Ammount)
+			if t.From.Bank != t.To.Bank { // Si es entre el mismo banco no actualizamos
+				b.r.Redis.IncrBy(b.ctx, fromBankKey, -t.Ammount)
+				b.r.Redis.IncrBy(b.ctx, toBankKey, t.Ammount)
+				b.r.Redis.IncrBy(b.ctx, FromToBankBalanceKey, t.Ammount)
+				b.r.Redis.IncrBy(b.ctx, ToFromBankBalanceKey, -t.Ammount)
+			}
 			t.Status = types.TransactionCompleted
 			t.ErrMsg = ""
 			return t
@@ -103,10 +104,11 @@ func (b *RedisBroker) Transfer(t types.Transaction) types.Transaction {
 			// Optimistic lock lost. Retry.
 			continue
 		}
+
 		return t
 	}
 
 	t.Status = types.TransactionError
-	t.ErrMsg = ""
+	t.ErrMsg = err.Error()
 	return t
 }

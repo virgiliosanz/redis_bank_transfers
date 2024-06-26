@@ -13,8 +13,9 @@ type Configuration struct {
 
 func GetDefaults() *Configuration {
 	return &Configuration{
-		AccountsFile:    "data/accounts_1000.csv",
-		RedisURL:        "redis://127.0.0.1:6379/",
+		AccountsFile: "data/accounts_1000.csv",
+		// RedisURL:        "redis://127.0.0.1:6379/",
+		RedisURL:        "redis://127.0.0.1:12000/",
 		Prefix:          "banks_transfers",
 		RedisMaxRetries: 100,
 		Transactions:    20000,

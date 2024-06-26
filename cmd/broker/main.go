@@ -72,6 +72,7 @@ func main() {
 	for i := 1; i <= int(cfg.Concurrency); i++ {
 		wg.Add(1)
 		bars[i] = uiprogress.AddBar(cfg.Transactions).AppendCompleted().PrependElapsed()
+
 		go func(id int) {
 			defer wg.Done()
 			// fmt.Fprintf(os.Stderr, "Goroutine %d started\n", id)
