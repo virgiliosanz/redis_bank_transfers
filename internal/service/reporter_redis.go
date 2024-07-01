@@ -18,6 +18,7 @@ type stats struct {
 	TransacionErrors    int64
 	TransacionCompleted int64
 	TransacionCancelled int64
+	Errors              []string
 }
 
 func (s *stats) addData(transaction types.Transaction) {
@@ -58,14 +59,30 @@ func (s *stats) addData(transaction types.Transaction) {
 		s.Balances[balanceKey] = current
 
 	case types.TransactionCreated:
+		msg := "Incomplete!! Transaction in Creation State: " + transaction.ErrMsg
+		s.Errors = append(s.Errors, msg)
 		s.TransacionErrors++
+
 	case types.TransactionRunning:
+		msg := "Incomplete!! Transaction in Running State: " + transaction.ErrMsg
+		s.Errors = append(s.Errors, msg)
 		s.TransacionErrors++
+
 	case types.TransactionCancelled:
+		// Transaction was cancelled because the origin account didn't have enough
+		// money to send the ammount requested
 		s.TransacionCancelled++
+
 	case types.TransactionError:
+		// Any other error while working on the transaction. Most common is that the
+		// proccess could not obtain the "lock" to read and modify the ammount in
+		// a loop of 100 tries
+		s.Errors = append(s.Errors, transaction.ErrMsg)
 		s.TransacionErrors++
+
 	default:
+		msg := "Unknown Error: " + transaction.ErrMsg
+		s.Errors = append(s.Errors, msg)
 		s.TransacionErrors++
 	}
 }
@@ -152,7 +169,7 @@ func (r *FileReporter) checkInterBankBalances() {
 	}
 
 	fmt.Println(Ok)
-	fmt.Printf("The sun of inter bank balances should be 0:  %d\n", total)
+	fmt.Printf("The sum of inter bank balances should be 0:  %d\n", total)
 }
 
 func (r *FileReporter) Report() {
@@ -162,4 +179,9 @@ func (r *FileReporter) Report() {
 	r.w.Stop()
 	fmt.Printf("\nTransactions Completed: %d Cancelled: %d Errors: %d\n",
 		r.stats.TransacionCompleted, r.stats.TransacionCancelled, r.stats.TransacionErrors)
+
+	fmt.Println("Errors found in the stream events:")
+	for i := 0; i < len(r.stats.Errors); i++ {
+		fmt.Println(r.stats.Errors[i])
+	}
 }

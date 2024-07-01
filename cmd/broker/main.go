@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"runtime"
 	"sync"
 
 	"redis_bank_transfers/config"
@@ -18,11 +17,10 @@ import (
 	"github.com/gosuri/uiprogress"
 )
 
-const maxConcurrency = 100
+const maxConcurrency = 250 // it is limit without logic. It is here just to size an array....
 
 func setUp() *config.Configuration {
 	cfg := config.GetDefaults()
-	// cfg := config.Configuration{}
 
 	flag.StringVar(&cfg.AccountsFile, "f", cfg.AccountsFile, "File with generated bank accounts.")
 	flag.StringVar(&cfg.RedisURL, "u", cfg.RedisURL, "Redis Connection Url")
@@ -47,8 +45,8 @@ func randonMoney(cfg *config.Configuration) int64 {
 }
 
 func main() {
-	maxProcs := runtime.NumCPU()
-	runtime.GOMAXPROCS(maxProcs)
+	// maxProcs := runtime.NumCPU()
+	// runtime.GOMAXPROCS(maxProcs - 1)
 
 	cfg := setUp()
 	fmt.Println("Starting Generating transactions using:")
@@ -75,7 +73,6 @@ func main() {
 
 		go func(id int) {
 			defer wg.Done()
-			// fmt.Fprintf(os.Stderr, "Goroutine %d started\n", id)
 
 			repo := repository.NewRedisRepository(cfg.RedisURL, cfg.Prefix, cfg.RedisMaxRetries)
 			defer repo.Close()

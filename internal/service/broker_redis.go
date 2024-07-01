@@ -34,16 +34,16 @@ func NewRedisBroker(repository *repository.RedisRepository) *RedisBroker {
 //
 // $ available = GET from_account
 //
-// ## check if ammount > available
+// ## check if ammount < available
 //
 // $ MULTI
 // $ incrby from_account -ammount
+// $ EXEC
 // $ incrby to_account ammount
 // $ incrby from_bank -ammount
 // $ incrby to_bank ammount
 // $ incrby fromBank_toBank -ammount
 // $ incrby toBank_fromBank ammount
-// $ EXEC
 func (b *RedisBroker) Transfer(t types.Transaction) types.Transaction {
 	fromAccountKey := b.as.Key(t.From.IBAN)
 	toAccountKey := b.as.Key(t.To.IBAN)
@@ -85,21 +85,47 @@ func (b *RedisBroker) Transfer(t types.Transaction) types.Transaction {
 
 	// Retry if the key has been changed.
 	var err error
-	for i := 0; i < b.r.MaxRetries; i++ {
+	var i int
+	for i = 0; i < b.r.MaxRetries; i++ {
 		err = b.r.Redis.Watch(b.ctx, txf, fromAccountKey)
 		if err == nil {
 			// Success!!!! Increment the rest of the values atomically
-			b.r.Redis.IncrBy(b.ctx, toAccountKey, t.Ammount)
 			if t.From.Bank != t.To.Bank { // Si es entre el mismo banco no actualizamos
-				b.r.Redis.IncrBy(b.ctx, fromBankKey, -t.Ammount)
-				b.r.Redis.IncrBy(b.ctx, toBankKey, t.Ammount)
-				b.r.Redis.IncrBy(b.ctx, FromToBankBalanceKey, t.Ammount)
-				b.r.Redis.IncrBy(b.ctx, ToFromBankBalanceKey, -t.Ammount)
+				if err = b.r.Redis.IncrBy(b.ctx, fromBankKey, -t.Ammount).Err(); err != nil {
+					t.Status = types.TransactionError
+					t.ErrMsg = fmt.Sprintf("Error in transaction: taking money out from the source bank :%s", err.Error())
+					return t
+				}
+				if err = b.r.Redis.IncrBy(b.ctx, toBankKey, t.Ammount).Err(); err != nil {
+					t.Status = types.TransactionError
+					t.ErrMsg = fmt.Sprintf("Error in transaction: sending money to the target bank :%s", err.Error())
+					return t
+				}
+
+				if err = b.r.Redis.IncrBy(b.ctx, FromToBankBalanceKey, t.Ammount).Err(); err != nil {
+					t.Status = types.TransactionError
+					t.ErrMsg = fmt.Sprintf("Error in transaction: Updating balance from-to :%s", err.Error())
+					return t
+				}
+
+				if err = b.r.Redis.IncrBy(b.ctx, ToFromBankBalanceKey, -t.Ammount).Err(); err != nil {
+					t.Status = types.TransactionError
+					t.ErrMsg = fmt.Sprintf("Error in transaction: Updating balance to-from: %s", err.Error())
+					return t
+				}
+
 			}
+			if err = b.r.Redis.IncrBy(b.ctx, toAccountKey, t.Ammount).Err(); err != nil {
+				t.Status = types.TransactionError
+				t.ErrMsg = fmt.Sprintf("Error in transaction: sending money to the target account :%s", err.Error())
+				return t
+			}
+
 			t.Status = types.TransactionCompleted
 			t.ErrMsg = ""
 			return t
 		}
+
 		if err == redis.TxFailedErr {
 			// Optimistic lock lost. Retry.
 			continue
@@ -109,6 +135,6 @@ func (b *RedisBroker) Transfer(t types.Transaction) types.Transaction {
 	}
 
 	t.Status = types.TransactionError
-	t.ErrMsg = err.Error()
+	t.ErrMsg = fmt.Sprintf("Error in transaction -> %d tries: %s", i, err.Error())
 	return t
 }

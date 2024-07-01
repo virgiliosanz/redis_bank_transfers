@@ -28,13 +28,6 @@ func NewRedisStream(repo *repository.RedisRepository) *RedisStream {
 }
 
 func (s *RedisStream) Send(t types.Transaction) error {
-	// values := map[string]interface{}{
-	// 	"account_from": t.From.IBAN,
-	// 	"account_to":   t.To.IBAN,
-	// 	"ammount":      t.Ammount,
-	// 	"disposable":   t.From.Ammount,
-	// 	"status":       t.Status,
-	// }
 	msg, err := json.Marshal(t)
 	if err != nil {
 		return fmt.Errorf("error marshaling transacion to json: %w", err)
@@ -53,16 +46,14 @@ func (s *RedisStream) Send(t types.Transaction) error {
 }
 
 func (s *RedisStream) Consume(r Reporter) error {
-	lastCompletedID := "0"
+	lastCompletedID := "0" // "0" = from the begining "$" = from first unread event
 	args := &redis.XReadArgs{Block: 2 * time.Second}
 	transaction := types.Transaction{}
 	for {
 		args.Streams = []string{s.transactionsStream, lastCompletedID}
 		streams, err := s.repo.Redis.XRead(s.ctx, args).Result()
 		if err != nil {
-			// log.Printf("No new messages from queue: %s", err)
-			// panic(err)
-			break
+			break // No more events or error reading....
 		}
 
 		for _, message := range streams[0].Messages {
