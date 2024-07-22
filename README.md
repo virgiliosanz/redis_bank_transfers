@@ -1,4 +1,3 @@
-
 # Demo of an Interbank Transfer Broker
 
 ## Requirements
@@ -24,6 +23,7 @@ Then we have 3 scripts in the ./cmd directory to run the test:
 : Clears the Redis database, reads the CSV file from the ./data directory, and
 loads this content into Redis. This would be the first script to run to test the
 connection with Redis. We can do it by running:
+
 > make init
 
 **./cmd/broker/main.go**
@@ -32,25 +32,26 @@ configuration. Each process establishes a connection to Redis and generates a
 number of random transactions between accounts. Each transaction performs the
 following steps in Redis:
 
-1. It makes a *Get* to obtain the current amount of money in the source account
-and checks if it has enough money to send.
+1. It makes a _Get_ to obtain the current amount of money in the source account
+   and checks if it has enough money to send.
 
 2. If the account has enough money, it goes to step 3. If not, the transaction
-stops, and an event is sent to the Redis queue indicating that the transaction
-was canceled. This step is critical because it needs to ensure that there are no
-race conditions. That is, no other process should withdraw money from the
-account in the time we read the available amount and deduct the money.
+   stops, and an event is sent to the Redis queue indicating that the transaction
+   was canceled. This step is critical because it needs to ensure that there are no
+   race conditions. That is, no other process should withdraw money from the
+   account in the time we read the available amount and deduct the money.
 
 3. If the destination and origin banks are the same, it does nothing with the
-bank balance keys. However, if they are different, it deducts the amount from
-the origin bank, adds it to the destination bank, and calculates the balances
-between the two banks.
+   bank balance keys. However, if they are different, it deducts the amount from
+   the origin bank, adds it to the destination bank, and calculates the balances
+   between the two banks.
 
-4. Afterward, it *deposits* the money into the destination account.
+4. Afterward, it _deposits_ the money into the destination account.
 
 These would be the Redis commands in a successful transaction:
 
 ```redis
+$ WATCH from_account
 $ MULTI
 $ get from_account
 $ incrby from_account -amount
@@ -62,8 +63,15 @@ $ incrby toBank_fromBank amount
 $ incrby to_account amount
 ```
 
+If var "from_account" changes before the incrby the multi transaction will fail
+due to the watch stament.You can learn more about redis transactions at
+https://redis.io/docs/latest/develop/interact/transactions/
+
+It is important to note, that single commands (incrby, set, ..) in redis are atomic,
+which means that only one procces can write to each key.
+
 5. At the end of the process, an event is sent to the Redis stream that receives
-the transactions.
+   the transactions.
 
 We can run this script by executing:
 
